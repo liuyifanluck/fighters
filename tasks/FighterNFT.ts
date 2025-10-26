@@ -45,7 +45,7 @@ task("fighter:mint", "Mints a new fighter with encrypted attributes")
   .addParam("stamina", "Stamina points (0-10)")
   .addOptionalParam("address", "Override deployment address")
   .setAction(async function (taskArguments: TaskArguments, hre) {
-    const { ethers } = hre;
+    const { ethers, fhevm } = hre;
 
     const agility = parseAttribute(taskArguments.agility, "agility");
     const strength = parseAttribute(taskArguments.strength, "strength");
@@ -59,7 +59,15 @@ task("fighter:mint", "Mints a new fighter with encrypted attributes")
 
     const [signer] = await ethers.getSigners();
 
-    const tx = await instance.connect(signer).mintFighter(agility, strength, stamina);
+    const input = fhevm.createEncryptedInput(address, signer.address);
+    input.add32(agility);
+    input.add32(strength);
+    input.add32(stamina);
+    const encrypted = await input.encrypt();
+
+    const tx = await instance
+      .connect(signer)
+      .mintFighter(encrypted.handles[0], encrypted.handles[1], encrypted.handles[2], encrypted.inputProof);
 
     console.log(`Mint transaction submitted: ${tx.hash}`);
     const receipt = await tx.wait();
@@ -101,7 +109,7 @@ task("fighter:update", "Updates fighter attributes")
   .addParam("stamina", "Stamina points (0-10)")
   .addOptionalParam("address", "Override deployment address")
   .setAction(async function (taskArguments: TaskArguments, hre) {
-    const { ethers } = hre;
+    const { ethers, fhevm } = hre;
 
     const agility = parseAttribute(taskArguments.agility, "agility");
     const strength = parseAttribute(taskArguments.strength, "strength");
@@ -116,7 +124,21 @@ task("fighter:update", "Updates fighter attributes")
 
     const tokenId = BigInt(taskArguments.tokenid);
 
-    const tx = await instance.connect(signer).updateAttributes(tokenId, agility, strength, stamina);
+    const input = fhevm.createEncryptedInput(address, signer.address);
+    input.add32(agility);
+    input.add32(strength);
+    input.add32(stamina);
+    const encrypted = await input.encrypt();
+
+    const tx = await instance
+      .connect(signer)
+      .updateAttributes(
+        tokenId,
+        encrypted.handles[0],
+        encrypted.handles[1],
+        encrypted.handles[2],
+        encrypted.inputProof,
+      );
 
     console.log(`Update transaction submitted: ${tx.hash}`);
     await tx.wait();

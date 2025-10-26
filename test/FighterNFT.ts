@@ -19,6 +19,28 @@ async function deployFixture() {
   return { contract, address };
 }
 
+type EncryptedAttributes = {
+  handles: readonly string[];
+  proof: string;
+};
+
+async function encryptAttributes(
+  contractAddress: string,
+  signer: HardhatEthersSigner,
+  distribution: [number, number, number],
+): Promise<EncryptedAttributes> {
+  const input = fhevm.createEncryptedInput(contractAddress, signer.address);
+  input.add32(distribution[0]);
+  input.add32(distribution[1]);
+  input.add32(distribution[2]);
+
+  const encrypted = await input.encrypt();
+  return {
+    handles: encrypted.handles,
+    proof: encrypted.inputProof,
+  };
+}
+
 async function decryptAttributes(
   contract: FighterNFT,
   contractAddress: string,
@@ -52,7 +74,10 @@ describe("FighterNFT", function () {
   it("mints fighters with encrypted attributes", async function () {
     const { contract, address } = await loadFixture(deployFixture);
 
-    const tx = await contract.connect(signers.alice).mintFighter(4, 3, 3);
+    const encrypted = await encryptAttributes(address, signers.alice, [4, 3, 3]);
+    const tx = await contract
+      .connect(signers.alice)
+      .mintFighter(encrypted.handles[0], encrypted.handles[1], encrypted.handles[2], encrypted.proof);
     const receipt = await tx.wait();
     expect(receipt?.status).to.equal(1);
 
@@ -69,21 +94,29 @@ describe("FighterNFT", function () {
     expect(totalSupply).to.equal(1n);
   });
 
-  it("rejects invalid attribute totals", async function () {
-    const { contract, address } = await loadFixture(deployFixture);
-
-    await expect(contract.connect(signers.alice).mintFighter(5, 3, 3)).to.be.revertedWithCustomError(
-      contract,
-      "AttributeTotalMismatch",
-    );
-  });
-
   it("updates attributes and maintains access", async function () {
     const { contract, address } = await loadFixture(deployFixture);
 
-    await contract.connect(signers.alice).mintFighter(3, 4, 3);
+    const initialAttributes = await encryptAttributes(address, signers.alice, [3, 4, 3]);
+    await contract
+      .connect(signers.alice)
+      .mintFighter(
+        initialAttributes.handles[0],
+        initialAttributes.handles[1],
+        initialAttributes.handles[2],
+        initialAttributes.proof,
+      );
 
-    const updateTx = await contract.connect(signers.alice).updateAttributes(1n, 2, 5, 3);
+    const updatedAttributes = await encryptAttributes(address, signers.alice, [2, 5, 3]);
+    const updateTx = await contract
+      .connect(signers.alice)
+      .updateAttributes(
+        1n,
+        updatedAttributes.handles[0],
+        updatedAttributes.handles[1],
+        updatedAttributes.handles[2],
+        updatedAttributes.proof,
+      );
     await updateTx.wait();
 
     const decrypted = await decryptAttributes(contract, address, 1, signers.alice);
@@ -93,7 +126,10 @@ describe("FighterNFT", function () {
   it("grants viewer access and handles transfers", async function () {
     const { contract, address } = await loadFixture(deployFixture);
 
-    await contract.connect(signers.alice).mintFighter(2, 4, 4);
+    const encrypted = await encryptAttributes(address, signers.alice, [2, 4, 4]);
+    await contract
+      .connect(signers.alice)
+      .mintFighter(encrypted.handles[0], encrypted.handles[1], encrypted.handles[2], encrypted.proof);
 
     await contract.connect(signers.alice).allowViewer(1n, signers.bob.address);
 

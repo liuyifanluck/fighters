@@ -1,6 +1,6 @@
 export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
-export const CONTRACT_ADDRESS = '0x0000000000000000000000000000000000000000';
+export const CONTRACT_ADDRESS = '0x166e2779F91C53Da1B21103c801a9AF463fE90f7';
 
 export const CONTRACT_ABI = [
   {
@@ -269,19 +269,24 @@ export const CONTRACT_ABI = [
   {
     "inputs": [
       {
-        "internalType": "uint32",
-        "name": "agilityPoints",
-        "type": "uint32"
+        "internalType": "externalEuint32",
+        "name": "agilityHandle",
+        "type": "bytes32"
       },
       {
-        "internalType": "uint32",
-        "name": "strengthPoints",
-        "type": "uint32"
+        "internalType": "externalEuint32",
+        "name": "strengthHandle",
+        "type": "bytes32"
       },
       {
-        "internalType": "uint32",
-        "name": "staminaPoints",
-        "type": "uint32"
+        "internalType": "externalEuint32",
+        "name": "staminaHandle",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes",
+        "name": "inputProof",
+        "type": "bytes"
       }
     ],
     "name": "mintFighter",
@@ -504,19 +509,24 @@ export const CONTRACT_ABI = [
         "type": "uint256"
       },
       {
-        "internalType": "uint32",
-        "name": "agilityPoints",
-        "type": "uint32"
+        "internalType": "externalEuint32",
+        "name": "agilityHandle",
+        "type": "bytes32"
       },
       {
-        "internalType": "uint32",
-        "name": "strengthPoints",
-        "type": "uint32"
+        "internalType": "externalEuint32",
+        "name": "strengthHandle",
+        "type": "bytes32"
       },
       {
-        "internalType": "uint32",
-        "name": "staminaPoints",
-        "type": "uint32"
+        "internalType": "externalEuint32",
+        "name": "staminaHandle",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes",
+        "name": "inputProof",
+        "type": "bytes"
       }
     ],
     "name": "updateAttributes",
@@ -526,4 +536,4 @@ export const CONTRACT_ABI = [
   }
 ] as const;
 
-export const IS_CONTRACT_CONFIGURED = CONTRACT_ADDRESS !== ZERO_ADDRESS;
+export const IS_CONTRACT_CONFIGURED = true;

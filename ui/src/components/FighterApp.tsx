@@ -139,6 +139,11 @@ export function FighterApp() {
       return;
     }
 
+    if (!instance) {
+      setMintError('Encryption service is not ready yet');
+      return;
+    }
+
     setMintError(null);
     setMintSuccess(null);
     setIsMinting(true);
@@ -149,8 +154,20 @@ export function FighterApp() {
         throw new Error('Signer is unavailable');
       }
 
+      const minterAddress = await resolvedSigner.getAddress();
+      const buffer = instance.createEncryptedInput(CONTRACT_ADDRESS, minterAddress);
+      buffer.add32(BigInt(distribution.agility));
+      buffer.add32(BigInt(distribution.strength));
+      buffer.add32(BigInt(distribution.stamina));
+
+      const encrypted = await buffer.encrypt();
+      if (!encrypted || encrypted.handles.length < 3) {
+        throw new Error('Failed to prepare encrypted attributes');
+      }
+
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, resolvedSigner);
-      const tx = await contract.mintFighter(distribution.agility, distribution.strength, distribution.stamina);
+      const [agilityHandle, strengthHandle, staminaHandle] = encrypted.handles as readonly `0x${string}`[];
+      const tx = await contract.mintFighter(agilityHandle, strengthHandle, staminaHandle, encrypted.inputProof);
       await tx.wait();
 
       setMintSuccess('Fighter minted successfully');
@@ -211,7 +228,7 @@ export function FighterApp() {
             type="button"
             className="primary-button"
             onClick={handleMint}
-            disabled={isMinting || totalPoints !== MAX_POINTS || !signer || !contractConfigured}
+            disabled={isMinting || totalPoints !== MAX_POINTS || !signer || !contractConfigured || !instance}
           >
             {isMinting ? 'Minting...' : 'Mint Fighter'}
           </button>
@@ -392,6 +409,11 @@ function FighterCard({ tokenId, handles, instance, signer, ownerAddress, contrac
       return;
     }
 
+    if (!instance) {
+      setUpdateError('Encryption service is not ready yet');
+      return;
+    }
+
     if (editTotal !== MAX_POINTS) {
       setUpdateError('Total points must equal 10');
       return;
@@ -406,12 +428,25 @@ function FighterCard({ tokenId, handles, instance, signer, ownerAddress, contrac
         throw new Error('Signer is unavailable');
       }
 
+      const updaterAddress = await signerInstance.getAddress();
+      const buffer = instance.createEncryptedInput(CONTRACT_ADDRESS, updaterAddress);
+      buffer.add32(BigInt(updateValues.agility));
+      buffer.add32(BigInt(updateValues.strength));
+      buffer.add32(BigInt(updateValues.stamina));
+
+      const encrypted = await buffer.encrypt();
+      if (!encrypted || encrypted.handles.length < 3) {
+        throw new Error('Failed to prepare encrypted attributes');
+      }
+
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signerInstance);
+      const [agilityHandle, strengthHandle, staminaHandle] = encrypted.handles as readonly `0x${string}`[];
       const tx = await contract.updateAttributes(
         tokenId,
-        updateValues.agility,
-        updateValues.strength,
-        updateValues.stamina
+        agilityHandle,
+        strengthHandle,
+        staminaHandle,
+        encrypted.inputProof
       );
       await tx.wait();
 
@@ -487,7 +522,7 @@ function FighterCard({ tokenId, handles, instance, signer, ownerAddress, contrac
             type="button"
             className="primary-button"
             onClick={handleUpdate}
-            disabled={isUpdating || editTotal !== MAX_POINTS || !contractConfigured}
+            disabled={isUpdating || editTotal !== MAX_POINTS || !contractConfigured || !instance || !signer}
           >
             {isUpdating ? 'Saving…' : 'Save changes'}
           </button>

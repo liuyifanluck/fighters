@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {FHE, euint32} from "@fhevm/solidity/lib/FHE.sol";
+import {FHE, euint32, externalEuint32} from "@fhevm/solidity/lib/FHE.sol";
 import {SepoliaConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
 
 interface IERC165 {
@@ -43,8 +43,6 @@ contract FighterNFT is IERC721Metadata, SepoliaConfig {
 
     string private constant _TOKEN_NAME = "Encrypted Fighter";
     string private constant _TOKEN_SYMBOL = "eFGT";
-    uint32 private constant _TOTAL_ATTRIBUTE_POINTS = 10;
-
     uint256 private _nextTokenId = 1;
     uint256 private _totalMinted;
 
@@ -128,7 +126,12 @@ contract FighterNFT is IERC721Metadata, SepoliaConfig {
         return (attributes.agility, attributes.strength, attributes.stamina);
     }
 
-    function mintFighter(uint32 agilityPoints, uint32 strengthPoints, uint32 staminaPoints)
+    function mintFighter(
+        externalEuint32 agilityHandle,
+        externalEuint32 strengthHandle,
+        externalEuint32 staminaHandle,
+        bytes calldata inputProof
+    )
         external
         returns (uint256 tokenId)
     {
@@ -136,7 +139,8 @@ contract FighterNFT is IERC721Metadata, SepoliaConfig {
         _nextTokenId++;
         _totalMinted++;
 
-        FighterAttributes memory encryptedAttributes = _createAttributes(agilityPoints, strengthPoints, staminaPoints);
+        FighterAttributes memory encryptedAttributes =
+            _createAttributes(agilityHandle, strengthHandle, staminaHandle, inputProof);
 
         _fighterAttributes[tokenId] = encryptedAttributes;
 
@@ -147,7 +151,13 @@ contract FighterNFT is IERC721Metadata, SepoliaConfig {
         _mint(msg.sender, tokenId);
     }
 
-    function updateAttributes(uint256 tokenId, uint32 agilityPoints, uint32 strengthPoints, uint32 staminaPoints)
+    function updateAttributes(
+        uint256 tokenId,
+        externalEuint32 agilityHandle,
+        externalEuint32 strengthHandle,
+        externalEuint32 staminaHandle,
+        bytes calldata inputProof
+    )
         external
         onlyExistingToken(tokenId)
     {
@@ -156,7 +166,8 @@ contract FighterNFT is IERC721Metadata, SepoliaConfig {
             revert NotAuthorized();
         }
 
-        FighterAttributes memory encryptedAttributes = _createAttributes(agilityPoints, strengthPoints, staminaPoints);
+        FighterAttributes memory encryptedAttributes =
+            _createAttributes(agilityHandle, strengthHandle, staminaHandle, inputProof);
 
         _fighterAttributes[tokenId] = encryptedAttributes;
 
@@ -260,16 +271,19 @@ contract FighterNFT is IERC721Metadata, SepoliaConfig {
         return _owners[tokenId] != address(0);
     }
 
-    function _createAttributes(uint32 agility, uint32 strength, uint32 stamina)
+    function _createAttributes(
+        externalEuint32 agilityHandle,
+        externalEuint32 strengthHandle,
+        externalEuint32 staminaHandle,
+        bytes calldata inputProof
+    )
         private
         returns (FighterAttributes memory attributes)
     {
-        _validateDistribution(agility, strength, stamina);
-
         attributes = FighterAttributes({
-            agility: FHE.asEuint32(agility),
-            strength: FHE.asEuint32(strength),
-            stamina: FHE.asEuint32(stamina)
+            agility: FHE.fromExternal(agilityHandle, inputProof),
+            strength: FHE.fromExternal(strengthHandle, inputProof),
+            stamina: FHE.fromExternal(staminaHandle, inputProof)
         });
     }
 
@@ -283,16 +297,6 @@ contract FighterNFT is IERC721Metadata, SepoliaConfig {
         FHE.allow(attributes.agility, viewer);
         FHE.allow(attributes.strength, viewer);
         FHE.allow(attributes.stamina, viewer);
-    }
-
-    function _validateDistribution(uint32 agility, uint32 strength, uint32 stamina) private pure {
-        if (agility > _TOTAL_ATTRIBUTE_POINTS || strength > _TOTAL_ATTRIBUTE_POINTS || stamina > _TOTAL_ATTRIBUTE_POINTS) {
-            revert AttributeOutOfRange();
-        }
-
-        if (agility + strength + stamina != _TOTAL_ATTRIBUTE_POINTS) {
-            revert AttributeTotalMismatch();
-        }
     }
 
     function _beforeTokenTransfer(address from, address to, uint256 tokenId) private {
